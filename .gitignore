@@ -1,0 +1,138 @@
+# ----------------------------
+# Python general
+# ----------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# ----------------------------
+# Virtual environments
+# ----------------------------
+venv/
+env/
+ENV/
+.venv/
+.python-version
+
+# ----------------------------
+# Jupyter Notebook
+# ----------------------------
+.ipynb_checkpoints/
+
+# ----------------------------
+# Environment variables
+# ----------------------------
+.env
+.env.*
+*.env
+
+# ----------------------------
+# IDE / Editor files
+# ----------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Cursor IDE specific
+.cursor/
+.cursor-cache/
+
+# ----------------------------
+# Logs & temp files
+# ----------------------------
+*.log
+logs/
+tmp/
+temp/
+
+# ----------------------------
+# OS files
+# ----------------------------
+.DS_Store
+Thumbs.db
+
+# ----------------------------
+# Gradio
+# ----------------------------
+gradio_cached_examples/
+gradio/flagged/
+
+# ----------------------------
+# LangChain / ChromaDB
+# ----------------------------
+chroma/
+chromadb/
+*.sqlite3
+*.db
+
+# ----------------------------
+# HuggingFace
+# ----------------------------
+.cache/huggingface/
+huggingface_cache/
+hf_cache/
+
+# ----------------------------
+# Ollama (local LLMs)
+# ----------------------------
+# Ollama stores models locally (can be huge)
+# Default paths (ignore if present in project)
+ollama/
+models/
+*.bin
+*.gguf
+
+# ----------------------------
+# PDF / Data files (optional)
+# ----------------------------
+# Uncomment if you don't want to track raw data
+*.pdf
+ data/
+ datasets/
+
+# ----------------------------
+# Pydantic / compiled configs
+# ----------------------------
+*.json
+*.yaml
+*.yml
+
+# (optional — only ignore if auto-generated)
+
+# ----------------------------
+# Testing / coverage
+# ----------------------------
+.coverage
+htmlcov/
+.pytest_cache/
+
+# ----------------------------
+# Distribution
+# ----------------------------
+*.tar.gz
+*.zip
+
+# ----------------------------
+# Secrets / API keys
+# ----------------------------
+secrets.json
+config.json
+credentials.json
