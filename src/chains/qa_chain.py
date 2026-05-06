@@ -1,42 +1,47 @@
-from __future__ import annotations
-
-from pathlib import Path
-
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnableLambda, RunnablePassthrough
-
-from src.llm.ollama_client import get_chat_model
-from src.prompts.qa_prompt import build_qa_prompt
+from langchain_classic.chains import RetrievalQA
+from src.llm.ollama_client import get_llm
 from src.vectorstore.chroma_store import get_vectorstore
+from src.prompts.prompt import qa_prompt
 
+from config import (
+    MODEL_NAME, 
+    COLLECTION_NAME, 
+    RETRIEVER_K)
 
-def _format_docs(docs) -> str:
-    return "\n\n".join(getattr(d, "page_content", str(d)) for d in docs)
+def get_qa_chain():
+    print("🔄 Initializing the QA Chain...")
 
+    # 1.Initialize the LLM
+    llm = get_llm()
+    if not llm:
+        print("⚠️ Error: Failed to initialize the LLM.")
+        return None
 
-def build_qa_chain(
-    *,
-    persist_dir: Path,
-    collection_name: str,
-    k: int,
-    ollama_base_url: str,
-    chat_model: str,
-):
-    vs = get_vectorstore(persist_dir=persist_dir, collection_name=collection_name)
-    retriever = vs.as_retriever(search_kwargs={"k": k})
-
-    prompt = build_qa_prompt()
-    llm = get_chat_model(model=chat_model, base_url=ollama_base_url)
-
-    chain = (
-        {
-            "question": RunnablePassthrough(),
-            "context": retriever | RunnableLambda(_format_docs),
-        }
-        | prompt
-        | llm
-        | StrOutputParser()
+    # 3. Load the VectorStore
+    vectorstore = get_vectorstore(
+        
+        collection_name=COLLECTION_NAME
     )
+    
+    if not vectorstore:
+        print("⚠️ Error: Failed to load the vector store.")
+        return None
 
-    return chain.with_config(run_name="qa_chain").map(lambda answer: {"answer": answer})
+    # 3. Configure the Retriever
+    retriever = vectorstore.as_retriever(search_kwargs={"k": RETRIEVER_K})
 
+    try:
+        # 4. Build the Final Chain
+        qa_chain = RetrievalQA.from_chain_type(
+            llm=llm,
+            chain_type="stuff",
+            retriever=retriever,
+            chain_type_kwargs={"prompt": qa_prompt()},
+            return_source_documents=True 
+        )
+        print(f"✅ QA Chain successfully built (Model: {MODEL_NAME}, Top K: {RETRIEVER_K}).")
+        return qa_chain
+        
+    except Exception as e:
+        print(f"⚠️ Failed to build QA Chain: {e}")
+        return None
