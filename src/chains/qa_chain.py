@@ -1,7 +1,7 @@
 from langchain_classic.chains import RetrievalQA
 from src.llm.ollama_client import get_llm
 from src.vectorstore.chroma_store import get_vectorstore
-from src.prompts.prompt import qa_prompt
+from src.prompts.qa_prompt import qa_prompt
 
 from config import (
     MODEL_NAME, 

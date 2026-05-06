@@ -13,7 +13,7 @@ from config import CHROMA_PATH, COLLECTION_NAME, DATA_PATH, MODEL_NAME, RETRIEVE
 from src.ingestion.chunker import split_documents
 from src.ingestion.loader import load_documents
 from src.llm.ollama_client import get_llm
-from src.prompts.prompt import qa_prompt_input
+from src.prompts.qa_prompt import qa_prompt
 from src.vectorstore.chroma_store import get_vectorstore
 
 
@@ -50,7 +50,7 @@ def build_rag_chain():
     retriever = vs.as_retriever(search_kwargs={"k": RETRIEVER_K})
 
     llm = get_llm()
-    prompt = qa_prompt_input()
+    prompt = qa_prompt()
 
     doc_chain = create_stuff_documents_chain(llm=llm, prompt=prompt)
     return create_retrieval_chain(retriever, doc_chain)
