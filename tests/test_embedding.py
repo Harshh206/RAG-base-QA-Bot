@@ -1,6 +1,6 @@
 from src.embeddings.embedding_model import get_embeddings
 
-# Initialize embeddings
+#Testing Initialize embeddings
 embeddings = get_embeddings()
 
 # Test with sample text
