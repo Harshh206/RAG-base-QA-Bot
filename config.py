@@ -1,18 +1,19 @@
-import os
+from pathlib import Path
 
-# Ollama
-OLLAMA_MODEL = "llama3:8b" # make sure you pulled this: ollama pull llama3
-
-# Embeddings
-EMBEDDING_MODEL = "qwen3-embedding:0.6b "
+# Model Names
+MODEL_NAME = "llama3:8b" 
+EMBEDDING_MODEL = "qwen3-embedding:0.6b"
 
 # Paths
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_PATH = os.path.join(BASE_DIR, "data/raw")
-CHROMA_PATH = os.path.join(BASE_DIR, "db/chroma")
+BASE_DIR = Path(__file__).resolve().parent
+DATA_PATH = BASE_DIR / "data" / "raw"
+CHROMA_PATH = BASE_DIR / "db" / "chroma"
 
-# Chunking
+# Vector Store Logic
+# This is the "folder" name inside your database
+COLLECTION_NAME = "rag_docs_collection" 
+
+# Chunking & Retrieval
 CHUNK_SIZE = 1000
 CHUNK_OVERLAP = 150
-
 RETRIEVER_K = 3
