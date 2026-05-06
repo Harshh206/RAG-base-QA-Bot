@@ -3,7 +3,7 @@ from src.ingestion.loader import load_documents
 def main():
     docs = load_documents()
 
-    print(f"\n✅ Total documents loaded: {len(docs)}\n")
+    print(f"\n✅Total documents loaded: {len(docs)}\n")
 
     if not docs:
         print("⚠️ No documents found. Check DATA_PATH.")

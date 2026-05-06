@@ -4,7 +4,7 @@ def main():
     llm = get_llm()
     
     try:
-        response = llm.invoke("Say hello in one short sentence.")
+        response = llm.invoke("Say Hello .")
         print("Model response:")
         print(response)
     except Exception as e:
