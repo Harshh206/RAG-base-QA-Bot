@@ -12,5 +12,7 @@ DATA_PATH = os.path.join(BASE_DIR, "data/raw")
 CHROMA_PATH = os.path.join(BASE_DIR, "db/chroma")
 
 # Chunking
-CHUNK_SIZE = 800
-CHUNK_OVERLAP = 100
+CHUNK_SIZE = 1000
+CHUNK_OVERLAP = 150
+
+RETRIEVER_K = 3
