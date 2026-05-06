@@ -1,9 +1,9 @@
 from langchain_ollama import ChatOllama
-from config import OLLAMA_MODEL
+from config import MODEL_NAME
 
 def get_llm():
     llm = ChatOllama(
-        model=OLLAMA_MODEL,
+        model=MODEL_NAME,
         temperature=0.2,       # Strict adherence to facts
         num_ctx=4096,          # Accommodates multiple retrieved chunks
         top_p=0.9,             # Focuses on the most likely answers
