@@ -1,0 +1,34 @@
+# install torch and torchvision with CUDA 12.6 separately that help GPU support and avoiding conflicts with other packages. Use this command to install:
+# pip install torch torchvision --index-url https://download.pytorch.org/whl/cu121
+
+# UI
+gradio
+# LangChain ecosystem
+langchain
+langchain-community
+langchain-core
+langchain-text-splitters
+langchain-chroma
+# Ollama (local LLM)
+langchain-ollama
+ollama
+# Vector Database
+chromadb
+# Embeddings
+sentence-transformers
+transformers
+# Document processing
+pypdf
+PyMuPDF
+docx2txt
+pandas
+openpyxl
+# Config / utils
+pydantic
+python-dotenv
+tqdm
+numpy
+
+# Dev / tests
+pytest
+
