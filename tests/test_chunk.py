@@ -1,6 +1,7 @@
 from src.ingestion.loader import load_documents
 from src.ingestion.chunker import split_documents
-
+ 
+#chunking Testing
 docs = load_documents()
 chunks = split_documents(docs)
 
