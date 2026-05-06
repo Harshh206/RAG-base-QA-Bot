@@ -3,5 +3,5 @@ from config import EMBEDDING_MODEL
 
 def get_embeddings():
     return OllamaEmbeddings(
-        model=EMBEDDING_MODEL
+        model=EMBEDDING_MODEL #Using qwen3-embedding:0.6b
     )
