@@ -5,8 +5,8 @@ from config import DATA_PATH
 from src.utils.excel_loader import load_excel_structured
 
 from langchain_core.documents import Document
-from langchain_community.document_loaders import PyMuPDFLoader, TextLoader, Docx2txtLoader, UnstructuredFileLoader
-
+from langchain_community.document_loaders import PyMuPDFLoader, TextLoader, Docx2txtLoader
+from langchain_unstructured import UnstructuredLoader
 
 def load_documents():
     directory = Path(DATA_PATH)
@@ -16,29 +16,62 @@ def load_documents():
         return []
 
     docs = []
+    
+    # We use a set for O(1) lookups during the fallback check
+    SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".docx", ".xlsx", ".xls"}
 
-    # PDFs
-    for pdf_path in sorted(directory.glob("*.pdf")):
-        docs.extend(PyMuPDFLoader(str(pdf_path)).load())
+    # Use iterdir() to process each file once efficiently
+    for file_path in sorted(directory.iterdir()):
+        if file_path.is_dir():
+            continue
+            
+        ext = file_path.suffix.lower()
 
-    # TXT
-    for txt_path in sorted(directory.glob("*.txt")):
-        docs.extend(TextLoader(str(txt_path), encoding="utf-8").load())
+        try:
+            # --- PDF ---
+            if ext == ".pdf":
+                for d in PyMuPDFLoader(str(file_path)).load():
+                    docs.append(Document(
+                        page_content=d.page_content,
+                        metadata={"source": str(file_path), "type": "pdf"}
+                    ))
 
-    # DOCX
-    for docx_path in sorted(directory.glob("*.docx")):
-        docs.extend(Docx2txtLoader(str(docx_path)).load())
+            # --- TXT ---
+            elif ext == ".txt":
+                for d in TextLoader(str(file_path), encoding="utf-8").load():
+                    docs.append(Document(
+                        page_content=d.page_content,
+                        metadata={"source": str(file_path), "type": "txt"}
+                    ))
 
-    # Excel (structured)
-    for excel_path in list(directory.glob("*.xlsx")) + list(directory.glob("*.xls")):
-        docs.extend(load_excel_structured(excel_path))
+            # --- DOCX ---
+            elif ext == ".docx":
+                for d in Docx2txtLoader(str(file_path)).load():
+                    docs.append(Document(
+                        page_content=d.page_content,
+                        metadata={"source": str(file_path), "type": "docx"}
+                    ))
 
-    # Fallback (other file types)
-    for file_path in directory.glob("*.*"):
-        if file_path.suffix.lower() not in [".pdf", ".txt", ".docx", ".xlsx", ".xls"]:
-            try:
-                docs.extend(UnstructuredFileLoader(str(file_path)).load())
-            except Exception as e:
-                print(f"⚠️ Skipped {file_path.name}: {e}")
+            # --- Excel ---
+            elif ext in [".xlsx", ".xls"]:
+                # Assuming load_excel_structured already returns Documents 
+                # with the correct metadata format per your previous code
+                docs.extend(load_excel_structured(file_path))
+
+            # --- Fallback (Other) ---
+            elif file_path.suffix: # Ensure it's actually a file with an extension
+                try:
+                    # Using UnstructuredLoader as requested in your imports
+                    loader = UnstructuredLoader(str(file_path))
+                    for d in loader.load():
+                        docs.append(Document(
+                            page_content=d.page_content,
+                            metadata={"source": str(file_path), "type": "other"}
+                        ))
+                except Exception as e:
+                    print(f"⚠️ Skipped {file_path.name}: {e}")
+
+        except Exception as e:
+            print(f"❌ Error processing {file_path.name}: {e}")
 
     return docs
