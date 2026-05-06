@@ -5,6 +5,7 @@
 gradio
 # LangChain ecosystem
 langchain
+langchain-classic
 langchain-community
 langchain-core
 langchain-text-splitters
