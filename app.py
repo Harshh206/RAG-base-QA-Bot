@@ -43,7 +43,7 @@ def _format_sources(source_documents):
     return "\n".join(items)
 
 
-def _history_to_text(history, max_turns=12):
+def _history_to_text(history, max_turns=15):
     if not history:
         return ""
 
@@ -110,6 +110,7 @@ def build_rag_chain(chat_history_text):
 def ingest_uploaded(files):
     return ingest_uploaded_files(
         files=files,
+        reset_db=True,
         chroma_path=str(CHROMA_PATH),
         collection_name=COLLECTION_NAME,
         split_documents=split_documents,
@@ -224,6 +225,7 @@ with gr.Blocks() as demo:
             ingest_upload_out = gr.Textbox(label="Status", lines=2)
             ingest_upload_btn.click(fn=ingest_uploaded, inputs=[uploads], outputs=ingest_upload_out)
             reset_btn.click(fn=reset_database, outputs=reset_out)
+            
 
 
         with gr.Column(scale=7, elem_id="main"):
@@ -244,8 +246,10 @@ with gr.Blocks() as demo:
                 clear_btn = gr.Button("Clear", variant="secondary", scale=1)
 
 
+
             q.submit(answer,[q, state],[state, chatbot]).then(lambda: "",None,q)
             ask_btn.click(answer,[q, state],[state, chatbot]).then(lambda: "",None,q)
+            clear_btn.click(lambda: ([], []), None, [state, chatbot])
 
 
 if __name__ == "__main__":
