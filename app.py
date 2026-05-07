@@ -1,28 +1,30 @@
-from __future__ import annotations
-
-import os
 import shutil
 import time
-from typing import Any
+from pathlib import Path
 
 import gradio as gr
 from langchain_classic.chains.combine_documents import create_stuff_documents_chain
-from langchain_classic.chains.retrieval import create_retrieval_chain
+from langchain_core.documents import Document
+from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 
 from config import CHROMA_PATH, COLLECTION_NAME, DATA_PATH, MODEL_NAME, RETRIEVER_K
 from src.ingestion.chunker import split_documents
 from src.ingestion.loader import load_documents
 from src.llm.ollama_client import get_llm
-from src.prompts.qa_prompt import qa_prompt
+from src.prompts.qa_prompt import qa_prompt_input
 from src.vectorstore.chroma_store import get_vectorstore
+from src.utils.upload_ingest import ingest_uploaded_files
 
 
-def _format_sources(source_documents: list[Any] | None) -> str:
+CHAT_LOG_PATH = Path(__file__).resolve().parent / "chat_logs" / "gradio_chat.jsonl"
+
+
+def _format_sources(source_documents):
     if not source_documents:
         return ""
 
-    seen: set[str] = set()
-    items: list[str] = []
+    seen = set()
+    items = []
     for doc in source_documents:
         source = None
         try:
@@ -31,7 +33,9 @@ def _format_sources(source_documents: list[Any] | None) -> str:
             source = None
         if not source:
             continue
-        name = os.path.basename(str(source))
+        
+        # Using Path(source).name instead of os.path.basename
+        name = Path(str(source)).name
         if name not in seen:
             seen.add(name)
             items.append(f"- {name}")
@@ -39,7 +43,46 @@ def _format_sources(source_documents: list[Any] | None) -> str:
     return "\n".join(items)
 
 
-def build_rag_chain():
+def _history_to_text(history, max_turns=12):
+    if not history:
+        return ""
+
+    lines = []
+
+    for msg in history[-max_turns:]:
+        if not isinstance(msg, dict):
+            continue
+
+        role = msg.get("role", "")
+        content = (msg.get("content") or "").strip()
+
+        if not content:
+            continue
+
+        if role == "user":
+            lines.append(f"User: {content}")
+
+        elif role == "assistant":
+            lines.append(f"Assistant: {content}")
+
+    return "\n".join(lines).strip()
+
+
+def _append_chat_log(user_text, assistant_text):
+    try:
+        CHAT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+        ts = time.strftime("%Y-%m-%dT%H:%M:%S")
+        if not CHAT_LOG_PATH.exists():
+            CHAT_LOG_PATH.write_text("", encoding="utf-8")
+        
+        with CHAT_LOG_PATH.open("a", encoding="utf-8") as f:
+            f.write(f'{{"ts":"{ts}","user":{user_text!r},"assistant":{assistant_text!r}}}\n')
+    except Exception:
+        # Logging should never break the chat.
+        pass
+
+
+def build_rag_chain(chat_history_text):
     """
     Build a retrieval-augmented generation chain using:
     - Chroma (persisted at CHROMA_PATH)
@@ -50,24 +93,36 @@ def build_rag_chain():
     retriever = vs.as_retriever(search_kwargs={"k": RETRIEVER_K})
 
     llm = get_llm()
-    prompt = qa_prompt()
+    prompt = qa_prompt_input()
 
     doc_chain = create_stuff_documents_chain(llm=llm, prompt=prompt)
-    return create_retrieval_chain(retriever, doc_chain)
+    
+    return (
+        {
+            "context": retriever,
+            "input": RunnablePassthrough(),
+            "chat_history": RunnableLambda(lambda _: chat_history_text),
+        }
+        | doc_chain
+    )
 
 
-def ingest(reset_db: bool = False) -> str:
+def ingest_uploaded(files):
+    return ingest_uploaded_files(
+        files=files,
+        chroma_path=str(CHROMA_PATH),
+        collection_name=COLLECTION_NAME,
+        split_documents=split_documents,
+        get_vectorstore=get_vectorstore,
+        log=lambda m: print(m, flush=True),
+    )
+
+
+def ingest():
     t0 = time.perf_counter()
     print("\n[ingest] Starting ingestion...", flush=True)
 
-    if reset_db:
-        try:
-            if os.path.exists(CHROMA_PATH):
-                shutil.rmtree(CHROMA_PATH)
-            print(f"[ingest] Reset DB folder: {CHROMA_PATH}", flush=True)
-        except Exception as e:
-            print(f"[ingest] Failed to reset DB: {e}", flush=True)
-            return f"❌ Failed to reset DB at {CHROMA_PATH}: {e}"
+    db_path = Path(CHROMA_PATH)
 
     docs = load_documents()
     if not docs:
@@ -87,64 +142,112 @@ def ingest(reset_db: bool = False) -> str:
     print(f"[ingest] Done in {elapsed:.2f}s. {msg}", flush=True)
     return msg
 
+def reset_database():
+    try:
+        db_path = Path(CHROMA_PATH)
 
-def answer(question: str) -> str:
+        if db_path.exists():
+            shutil.rmtree(db_path)
+
+        return f"✅ Database reset successfully: {CHROMA_PATH}"
+
+    except Exception as e:
+        return f"❌ Failed to reset database: {e}"
+
+def answer(question, history):
     question = (question or "").strip()
     if not question:
-        return "Please enter a question."
+        return (history or []), "Please enter a question."
 
     t0 = time.perf_counter()
     print("\n[qa] Question:", question, flush=True)
-    chain = build_rag_chain()
+
+    history_text = _history_to_text(history)
+    chain = build_rag_chain(chat_history_text=history_text)
     t_chain = time.perf_counter()
-    result = chain.invoke({"input": question})
+    answer_text = chain.invoke(question)
     t_done = time.perf_counter()
 
-    answer_text = result.get("answer") or ""
-    ctx = result.get("context")
-    sources_text = _format_sources(ctx)
-
-    ctx_count = len(ctx) if isinstance(ctx, list) else 0
-    print(f"[qa] Retrieved docs: {ctx_count}", flush=True)
-    if sources_text:
-        print("[qa] Sources:\n" + sources_text, flush=True)
     print(f"[qa] Timings: build_chain={(t_chain - t0):.2f}s, invoke={(t_done - t_chain):.2f}s, total={(t_done - t0):.2f}s", flush=True)
     preview = (answer_text[:400] + "…") if len(answer_text) > 400 else answer_text
     print("[qa] Answer preview:\n" + preview, flush=True)
 
-    if sources_text:
-        return f"{answer_text}\n\nSources:\n{sources_text}"
-    return answer_text
+    new_history = list(history or [])
 
-
-with gr.Blocks() as demo:
-    gr.Markdown("# 🤖 RAG QA Assistant (LangChain + Ollama + Chroma)")
-    gr.Markdown(
-        f"- **Model**: `{MODEL_NAME}`\n"
-        f"- **Chroma DB**: `{CHROMA_PATH}`\n"
-        f"- **Collection**: `{COLLECTION_NAME}`\n"
-        f"- **Data folder**: `{DATA_PATH}`"
+    new_history.append(
+        {
+            "role": "user",
+            "content": question,
+        }
     )
 
-    with gr.Tab("Knowledge Base"):
-        reset = gr.Checkbox(value=False, label="Reset DB before ingest (recommended if results look wrong)")
-        ingest_btn = gr.Button("Build / Update Vector Database", variant="primary")
-        ingest_out = gr.Textbox(label="Status", lines=2)
-        ingest_btn.click(fn=ingest, inputs=reset, outputs=ingest_out)
+    new_history.append(
+        {
+            "role": "assistant",
+            "content": answer_text,
+        }
+    )
 
-    with gr.Tab("Ask"):
-        q = gr.Textbox(
-            label="Question",
-            placeholder="Ask a question about your documents...",
-            lines=2,
-        )
-        ask_btn = gr.Button("Submit", variant="primary")
-        a = gr.Textbox(label="Answer", lines=12)
-        ask_btn.click(fn=answer, inputs=q, outputs=a)
-        q.submit(fn=answer, inputs=q, outputs=a)
+    _append_chat_log(question, answer_text)
+
+    return new_history, new_history
+
+
+
+_CSS = """
+/* ChatGPT-ish layout */
+.container { max-width: 1200px !important; }
+#sidebar { background: #0b1220; border-radius: 12px; padding: 14px; }
+#sidebar h3, #sidebar label, #sidebar p { color: #e6e8ee !important; }
+#main { border-radius: 12px; }
+#chatbot { height: 72vh; }
+"""
+
+with gr.Blocks() as demo:
+    state = gr.State([])
+
+    with gr.Row(equal_height=True):
+        with gr.Column(scale=3, min_width=320, elem_id="sidebar"):
+            gr.Markdown("### RAG QA Assistant")
+            gr.Markdown(
+                f"**Model**: `{MODEL_NAME}`  \n"
+                f"**DB**: `{CHROMA_PATH}`  \n"
+                f"**Collection**: `{COLLECTION_NAME}`  \n"
+            )
+
+            reset_btn = gr.Button("Reset DB", variant="stop")
+            reset_out = gr.Textbox(label="Reset Status", lines=2)
+            
+            gr.Markdown("### Upload & ingest")
+            uploads = gr.File(label="Upload documents", file_count="multiple", type="filepath")
+            ingest_upload_btn = gr.Button("Ingest uploaded files", variant="primary")
+            ingest_upload_out = gr.Textbox(label="Status", lines=2)
+            ingest_upload_btn.click(fn=ingest_uploaded, inputs=[uploads], outputs=ingest_upload_out)
+            reset_btn.click(fn=reset_database, outputs=reset_out)
+
+
+        with gr.Column(scale=7, elem_id="main"):
+            chatbot = gr.Chatbot(
+                label="",
+                elem_id="chatbot"
+            )
+
+            with gr.Row():
+                q = gr.Textbox(
+                    label="",
+                    placeholder="Message…",
+                    lines=2,
+                    autofocus=True,
+                    scale=8,
+                )
+                ask_btn = gr.Button("Send", variant="primary", scale=1)
+                clear_btn = gr.Button("Clear", variant="secondary", scale=1)
+
+
+            q.submit(answer,[q, state],[state, chatbot]).then(lambda: "",None,q)
+            ask_btn.click(answer,[q, state],[state, chatbot]).then(lambda: "",None,q)
 
 
 if __name__ == "__main__":
-    # Queue helps when Ollama responses take ~1-2 minutes.
     demo.queue()
-    demo.launch(theme=gr.themes.Soft(), show_error=True)
+    demo.launch(theme=gr.themes.Soft(),css=_CSS, show_error=True)
