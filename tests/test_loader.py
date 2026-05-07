@@ -1,6 +1,6 @@
 from src.ingestion.loader import load_documents
 
-def main():
+def test_loader():
     docs = load_documents()
 
     print(f"\n✅ Total documents loaded: {len(docs)}\n")
@@ -19,4 +19,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+   test_loader()

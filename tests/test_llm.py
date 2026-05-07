@@ -1,6 +1,6 @@
 from src.llm.ollama_client import get_llm   # replace with your file name
 
-def main():
+def test_llm():
     llm = get_llm()
     
     try:
@@ -12,4 +12,4 @@ def main():
         print(e)
 
 if __name__ == "__main__":
-    main()
+    test_llm()

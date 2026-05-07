@@ -1,7 +1,7 @@
 from src.vectorstore.chroma_store import get_vectorstore
 from config import COLLECTION_NAME
 
-def check_db_contents(limit: int = 10) -> None:
+def test_check_db_contents(limit: int = 10) -> None:
     vs = get_vectorstore(collection_name=COLLECTION_NAME)
     data = vs.get(limit=limit)
 
@@ -12,7 +12,7 @@ def check_db_contents(limit: int = 10) -> None:
         print(f"✅ Found {len(ids)} documents in the collection.\n")
 
 
-def run_similarity_search(query: str = "Hello") -> None:
+def test_run_similarity_search(query: str = "Hello") -> None:
     vs = get_vectorstore(collection_name=COLLECTION_NAME)
     vs.add_texts(["Hello world", "LangChain with Ollama"])
     results = vs.similarity_search(query)
@@ -20,5 +20,5 @@ def run_similarity_search(query: str = "Hello") -> None:
 
 
 if __name__ == "__main__":
-    check_db_contents()
-    run_similarity_search()
+    test_check_db_contents()
+    test_run_similarity_search()

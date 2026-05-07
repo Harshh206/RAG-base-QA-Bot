@@ -1,11 +1,24 @@
 from src.embeddings.embedding_model import get_embeddings
 
-#Testing Initialize embeddings
-embeddings = get_embeddings()
 
-# Test with sample text
-text = "Hello world"
-vector = embeddings.embed_query(text)
+def test_embeddings():
+    # Initialize embeddings model
+    embeddings = get_embeddings()
 
-print("Embedding vector length:", len(vector))
-print("First 5 values:", vector[:5])
+    # Ensure model loaded
+    assert embeddings is not None
+
+    # Sample text
+    text = "Hello world"
+
+    # Generate embedding
+    vector = embeddings.embed_query(text)
+
+    # Validate embedding output
+    assert vector is not None
+    assert isinstance(vector, list)
+    assert len(vector) > 0
+
+    # Debug output
+    print(f"\n✅ Embedding vector length: {len(vector)}")
+    print(f"🔹 First 5 values: {vector[:5]}")
