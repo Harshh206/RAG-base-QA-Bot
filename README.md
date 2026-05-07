@@ -1,4 +1,4 @@
-﻿## 🤖 RAG QA Bot Using LangChain
+﻿## 🤖  RAG QA Bot with LangChain and Local LLMs
 
 A powerful **Retrieval-Augmented Generation (RAG)** based Question Answering Bot built using:
 
