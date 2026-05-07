@@ -39,7 +39,12 @@ def qa_prompt_input() -> ChatPromptTemplate:
     return ChatPromptTemplate.from_messages(
         [
             ("system", _SYSTEM),
-            ("human", "--- RELEVANT DOCUMENTS ---\n{context}\n\n--- USER QUESTION ---\n{input}"),
+            (
+                "human",
+                "--- RELEVANT DOCUMENTS ---\n{context}\n\n"
+                "--- CHAT HISTORY ---\n{chat_history}\n\n"
+                "--- USER QUESTION ---\n{input}",
+            ),
         ]
     )
 
