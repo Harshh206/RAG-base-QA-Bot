@@ -12,7 +12,7 @@ def test_system():
     query = "What is the main topic of the uploaded documents?"
     
     print(f"\n🔍 Testing Query: {query}")
-    response = chain({"query": query})
+    response = chain.invoke({"query": query})
 
     # 1. Check the Answer
     print("\n🤖 AI Response:")
