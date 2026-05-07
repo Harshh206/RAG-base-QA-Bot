@@ -13,7 +13,7 @@ from src.ingestion.loader import load_documents
 from src.llm.ollama_client import get_llm
 from src.prompts.qa_prompt import qa_prompt_input
 from src.vectorstore.chroma_store import get_vectorstore
-from src.utils.upload_ingest import ingest_uploaded_files
+from src.ingestion.upload_ingest import ingest_uploaded_files
 
 
 CHAT_LOG_PATH = Path(__file__).resolve().parent / "chat_logs" / "gradio_chat.jsonl"
@@ -110,8 +110,6 @@ def build_rag_chain(chat_history_text):
 def ingest_uploaded(files):
     return ingest_uploaded_files(
         files=files,
-        reset_db=True,
-        chroma_path=str(CHROMA_PATH),
         collection_name=COLLECTION_NAME,
         split_documents=split_documents,
         get_vectorstore=get_vectorstore,
@@ -144,13 +142,12 @@ def ingest():
     return msg
 
 def reset_database():
+    """Safely reset the database using Chroma's native deletion instead of shutil."""
     try:
-        db_path = Path(CHROMA_PATH)
-
-        if db_path.exists():
-            shutil.rmtree(db_path)
-
-        return f"✅ Database reset successfully: {CHROMA_PATH}"
+        vs = get_vectorstore(collection_name=COLLECTION_NAME)
+        vs.delete_collection()
+        time.sleep(0.5) # Give Windows a moment to catch its breath
+        return f"✅ Database collection '{COLLECTION_NAME}' reset successfully."
 
     except Exception as e:
         return f"❌ Failed to reset database: {e}"
@@ -163,9 +160,24 @@ def answer(question, history):
     t0 = time.perf_counter()
     print("\n[qa] Question:", question, flush=True)
 
+    # --- X-RAY DEBUGGER: Check what the database is actually finding ---
+    try:
+        temp_vs = get_vectorstore(collection_name=COLLECTION_NAME)
+        found_docs = temp_vs.similarity_search(question, k=3)
+        print(f"\n[debug] 🔍 The Database found {len(found_docs)} chunks to give the LLM:", flush=True)
+        for i, d in enumerate(found_docs):
+            source = d.metadata.get('source', 'unknown')
+            preview = d.page_content.replace("\n", " ")[:80]
+            print(f"  {i+1}. Source: {Path(source).name} | Text: {preview}...", flush=True)
+        print("-" * 50, flush=True)
+    except Exception as e:
+        print(f"[debug] ❌ Search failed: {e}", flush=True)
+    # -------------------------------------------------------------------
+
     history_text = _history_to_text(history)
     chain = build_rag_chain(chat_history_text=history_text)
     t_chain = time.perf_counter()
+    
     answer_text = chain.invoke(question)
     t_done = time.perf_counter()
 

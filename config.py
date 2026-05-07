@@ -14,6 +14,6 @@ CHROMA_PATH = BASE_DIR / "db" / "chroma"
 COLLECTION_NAME = "rag_docs_collection" 
 
 # Chunking & Retrieval
-CHUNK_SIZE = 1000
-CHUNK_OVERLAP = 150
-RETRIEVER_K = 3
+CHUNK_SIZE = 600
+CHUNK_OVERLAP = 85
+RETRIEVER_K = 5

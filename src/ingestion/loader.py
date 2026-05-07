@@ -1,77 +1,67 @@
 from pathlib import Path
-import pandas as pd
-
 from config import DATA_PATH
-from src.utils.excel_loader import load_excel_structured
 
 from langchain_core.documents import Document
-from langchain_community.document_loaders import PyMuPDFLoader, TextLoader, Docx2txtLoader
-from langchain_unstructured import UnstructuredLoader
+from langchain_community.document_loaders import (
+    Docx2txtLoader,
+    PyMuPDFLoader,
+    TextLoader,
+)
+from src.ingestion.excel_loader import load_excel_structured
+
+def load_single_document(file_path) -> list[Document]:
+    """Loads a single file and returns a list of LangChain Documents with consistent metadata."""
+    path = Path(file_path)
+    
+    if not path.exists() or not path.is_file():
+        return []
+
+    ext = path.suffix.lower()
+    docs = []
+
+    try:
+        # --- Core Loaders ---
+        if ext == ".pdf":
+            docs = PyMuPDFLoader(str(path)).load()
+        elif ext == ".txt":
+            docs = TextLoader(str(path), encoding="utf-8").load()
+        elif ext == ".docx":
+            docs = Docx2txtLoader(str(path)).load()
+        elif ext in [".xlsx", ".xls"]:
+            docs = load_excel_structured(str(path))
+            
+        # --- Fallback Loader ---
+        else:
+            # Lazy import to speed up processing for standard files
+            from langchain_unstructured import UnstructuredLoader
+            docs = UnstructuredLoader(str(path)).load()
+
+        # --- Enforce Consistent Metadata ---
+        doc_type = ext.lstrip('.') if ext else "other"
+        
+        for doc in docs:
+            # Overwrite or set standard metadata so filtering works flawlessly later
+            doc.metadata["source"] = str(path)
+            doc.metadata["type"] = doc_type
+
+    except Exception as e:
+        print(f"❌ Error loading {path.name}: {e}")
+
+    return docs
 
 def load_documents():
+    """Batch loads all supported documents from the configured DATA_PATH."""
     directory = Path(DATA_PATH)
 
     if not directory.exists() or not directory.is_dir():
         print(f"⚠️ Directory not found: {directory}")
         return []
 
-    docs = []
+    all_docs = []
     
-    # We use a set for O(1) lookups during the fallback check
-    SUPPORTED_EXTENSIONS = {".pdf", ".txt", ".docx", ".xlsx", ".xls"}
-
-    # Use iterdir() to process each file once efficiently
+    # Process all files in the directory
     for file_path in sorted(directory.iterdir()):
-        if file_path.is_dir():
-            continue
-            
-        ext = file_path.suffix.lower()
+        if file_path.is_file():
+            all_docs.extend(load_single_document(file_path))
 
-        try:
-            # --- PDF ---
-            if ext == ".pdf":
-                for d in PyMuPDFLoader(str(file_path)).load():
-                    docs.append(Document(
-                        page_content=d.page_content,
-                        metadata={"source": str(file_path), "type": "pdf"}
-                    ))
-
-            # --- TXT ---
-            elif ext == ".txt":
-                for d in TextLoader(str(file_path), encoding="utf-8").load():
-                    docs.append(Document(
-                        page_content=d.page_content,
-                        metadata={"source": str(file_path), "type": "txt"}
-                    ))
-
-            # --- DOCX ---
-            elif ext == ".docx":
-                for d in Docx2txtLoader(str(file_path)).load():
-                    docs.append(Document(
-                        page_content=d.page_content,
-                        metadata={"source": str(file_path), "type": "docx"}
-                    ))
-
-            # --- Excel ---
-            elif ext in [".xlsx", ".xls"]:
-                # Assuming load_excel_structured already returns Documents 
-                # with the correct metadata format per your previous code
-                docs.extend(load_excel_structured(file_path))
-
-            # --- Fallback (Other) ---
-            elif file_path.suffix: # Ensure it's actually a file with an extension
-                try:
-                    # Using UnstructuredLoader as requested in your imports
-                    loader = UnstructuredLoader(str(file_path))
-                    for d in loader.load():
-                        docs.append(Document(
-                            page_content=d.page_content,
-                            metadata={"source": str(file_path), "type": "other"}
-                        ))
-                except Exception as e:
-                    print(f"⚠️ Skipped {file_path.name}: {e}")
-
-        except Exception as e:
-            print(f"❌ Error processing {file_path.name}: {e}")
-
-    return docs
+    return all_docs
